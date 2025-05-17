@@ -1,4 +1,5 @@
 use cust::prelude::*;
+use cust::context::Context as CudaContext;
 use anyhow::Result;
 
 pub fn test_cuda_init() -> Result<()> {
@@ -15,10 +16,12 @@ pub fn test_cuda_init() -> Result<()> {
                     Ok(device) => {
                         println!("Successfully got device 0");
                         println!("Device name: {}", device.name()?);
+                        // Get compute capability using device properties
+                        let props = device.properties()?;
                         println!("Compute capability: {}.{}", 
-                            device.compute_capability()?.major,
-                            device.compute_capability()?.minor);
-                        println!("Total memory: {} MB", device.total_memory()? / 1024 / 1024);
+                            props.major,
+                            props.minor);
+                        println!("Total memory: {} MB", props.total_global_mem / 1024 / 1024);
                     },
                     Err(e) => println!("Failed to get device 0: {}", e),
                 }
