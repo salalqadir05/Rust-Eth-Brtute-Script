@@ -92,9 +92,23 @@ export CUDA_PATH
 export PATH="$CUDA_PATH/bin:$PATH"
 export LD_LIBRARY_PATH="$CUDA_LIB_PATH:$LD_LIBRARY_PATH"
 
+# Additional CUDA environment variables
+export CUDA_HOME="$CUDA_PATH"
+export CUDA_INC_PATH="$CUDA_PATH/include"
+export CUDA_LIBRARY_PATH="$CUDA_LIB_PATH"
+export CUDA_RUNTIME_LIBRARY_PATH="$CUDA_LIB_PATH"
+export CUDA_DRIVER_LIBRARY_PATH="$CUDA_LIB_PATH"
+
+# Set specific version for cust crate
+export CUDA_TOOLKIT_ROOT_DIR="$CUDA_PATH"
+export CUDA_TOOLKIT_VERSION="11.8"
+
 # Print environment
 echo -e "\nCUDA Environment:"
 echo "CUDA_PATH: $CUDA_PATH"
+echo "CUDA_HOME: $CUDA_HOME"
+echo "CUDA_TOOLKIT_ROOT_DIR: $CUDA_TOOLKIT_ROOT_DIR"
+echo "CUDA_TOOLKIT_VERSION: $CUDA_TOOLKIT_VERSION"
 echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
 
 # Verify cargo is installed
@@ -103,6 +117,11 @@ if ! command -v cargo &> /dev/null; then
     exit 1
 fi
 
+# Clean and rebuild
+echo -e "\nCleaning and rebuilding project..."
+cargo clean
+cargo build
+
 # Run the program
 echo -e "\nRunning program with CUDA environment..."
-cargo run "$@" 
+RUST_BACKTRACE=1 cargo run "$@" 
