@@ -25,20 +25,36 @@ fn check_cuda_libraries() -> Result<()> {
         "libnvidia-ml.so"
     ];
 
+    // Get CUDA toolkit version from environment
+    let cuda_version = env::var("CUDA_TOOLKIT_VERSION")
+        .unwrap_or_else(|_| "11.8".to_string());
+    println!("Expected CUDA version: {}", cuda_version);
+
     let mut all_found = true;
     for lib in cuda_libs.iter() {
         if stdout.contains(lib) {
             println!("Found {}", lib);
-            // Try to get the actual path
+            // Try to get all versions of this library
             if let Ok(output) = Command::new("ldconfig")
                 .arg("-p")
                 .output()
             {
                 let stdout = String::from_utf8_lossy(&output.stdout);
-                if let Some(line) = stdout.lines().find(|l| l.contains(lib)) {
-                    if let Some(path) = line.split("=>").nth(1) {
-                        println!("  Path: {}", path.trim());
+                let mut found_versions = Vec::new();
+                for line in stdout.lines() {
+                    if line.contains(lib) {
+                        if let Some(path) = line.split("=>").nth(1) {
+                            let path = path.trim();
+                            println!("  Path: {}", path);
+                            // Try to extract version from path
+                            if let Some(version) = path.split("so.").nth(1) {
+                                found_versions.push(version.to_string());
+                            }
+                        }
                     }
+                }
+                if !found_versions.is_empty() {
+                    println!("  Available versions: {}", found_versions.join(", "));
                 }
             }
         } else {
@@ -47,24 +63,33 @@ fn check_cuda_libraries() -> Result<()> {
         }
     }
 
-    if !all_found {
-        // If some libraries are missing, try direct path
-        let cuda_lib_path = env::var("CUDA_LIBRARY_PATH")
-            .unwrap_or_else(|_| "/usr/local/cuda/lib64".to_string());
-        
+    // Check specific CUDA paths
+    let cuda_paths = [
+        "/usr/local/cuda/lib64",
+        "/usr/local/cuda-11.8/lib64",
+        "/usr/lib/cuda/lib64",
+        "/usr/lib/nvidia-cuda-toolkit/lib64"
+    ];
+
+    println!("\nChecking specific CUDA paths:");
+    for path in cuda_paths.iter() {
         if let Ok(output) = Command::new("ls")
-            .arg(&cuda_lib_path)
+            .arg("-l")
+            .arg(path)
             .output() 
         {
             if output.status.success() {
-                let libs = String::from_utf8_lossy(&output.stdout);
-                println!("\nChecking direct path {}:", cuda_lib_path);
-                for lib in cuda_libs.iter() {
-                    if libs.contains(lib) {
-                        println!("Found {} in {}", lib, cuda_lib_path);
-                    }
-                }
+                println!("\nContents of {}:", path);
+                println!("{}", String::from_utf8_lossy(&output.stdout));
             }
+        }
+    }
+
+    // Check if CUDA libraries are in the correct order in LD_LIBRARY_PATH
+    if let Ok(ld_path) = env::var("LD_LIBRARY_PATH") {
+        println!("\nLD_LIBRARY_PATH order:");
+        for (i, path) in ld_path.split(':').enumerate() {
+            println!("{}. {}", i + 1, path);
         }
     }
 
