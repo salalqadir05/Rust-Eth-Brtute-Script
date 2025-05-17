@@ -110,6 +110,18 @@ pub fn test_cuda_init() -> Result<()> {
                 }
             }
             
+            // Try to get NVIDIA driver version
+            if let Ok(output) = Command::new("nvidia-smi")
+                .arg("--query-gpu=driver_version")
+                .arg("--format=csv,noheader")
+                .output()
+            {
+                if output.status.success() {
+                    println!("NVIDIA Driver Version:");
+                    println!("{}", String::from_utf8_lossy(&output.stdout));
+                }
+            }
+            
             return Err(e).context("Failed to get number of CUDA devices");
         }
     };
@@ -136,14 +148,14 @@ pub fn test_cuda_init() -> Result<()> {
         Err(e) => println!("Warning: Could not get device name: {}", e),
     }
 
-    // Try to create a context
-    match CudaContext::new(device) {
-        Ok(_) => println!("Successfully created CUDA context"),
-        Err(e) => {
-            println!("Error creating CUDA context: {}", e);
-            return Err(e).context("Failed to create CUDA context");
-        }
-    }
+    // Create context and set flags
+    let context = CudaContext::new(device)
+        .with_context(|| "Failed to create CUDA context")?;
+    
+    context.set_flags(cust::context::ContextFlags::SCHED_AUTO)
+        .with_context(|| "Failed to set context flags")?;
+    
+    println!("Successfully created CUDA context");
 
     Ok(())
 } 
