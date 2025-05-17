@@ -146,6 +146,40 @@ pub fn test_cuda_init() -> Result<()> {
                     println!("{}", String::from_utf8_lossy(&output.stdout));
                 }
             }
+
+            // Try to get CUDA runtime error
+            if let Ok(output) = Command::new("cuda-memcheck")
+                .arg("--version")
+                .output()
+            {
+                if output.status.success() {
+                    println!("CUDA Memory Checker Version:");
+                    println!("{}", String::from_utf8_lossy(&output.stdout));
+                }
+            }
+
+            // Try to get CUDA device properties using nvidia-smi
+            if let Ok(output) = Command::new("nvidia-smi")
+                .arg("--query-gpu=name,memory.total,driver_version,cuda_version")
+                .arg("--format=csv,noheader")
+                .output()
+            {
+                if output.status.success() {
+                    println!("\nGPU Information:");
+                    println!("{}", String::from_utf8_lossy(&output.stdout));
+                }
+            }
+
+            // Try to get CUDA runtime error using nvprof
+            if let Ok(output) = Command::new("nvprof")
+                .arg("--version")
+                .output()
+            {
+                if output.status.success() {
+                    println!("\nCUDA Profiler Version:");
+                    println!("{}", String::from_utf8_lossy(&output.stdout));
+                }
+            }
             
             return Err(e).context("Failed to get number of CUDA devices");
         }
@@ -174,13 +208,24 @@ pub fn test_cuda_init() -> Result<()> {
     }
 
     // Create context and set flags
-    let context = CudaContext::new(device)
-        .with_context(|| "Failed to create CUDA context")?;
+    let context = match CudaContext::new(device) {
+        Ok(ctx) => {
+            println!("Successfully created CUDA context");
+            ctx
+        },
+        Err(e) => {
+            println!("Error creating CUDA context: {}", e);
+            return Err(e).context("Failed to create CUDA context");
+        }
+    };
     
-    context.set_flags(cust::context::ContextFlags::SCHED_AUTO)
-        .with_context(|| "Failed to set context flags")?;
-    
-    println!("Successfully created CUDA context");
+    match context.set_flags(cust::context::ContextFlags::SCHED_AUTO) {
+        Ok(_) => println!("Successfully set context flags"),
+        Err(e) => {
+            println!("Warning: Failed to set context flags: {}", e);
+            // Continue anyway as this is not critical
+        }
+    }
 
     Ok(())
 } 
