@@ -6,6 +6,7 @@ use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use std::thread;
 
 mod gpu_wrapper;
+mod cuda_test;
 use gpu_wrapper::GpuWorker;
 
 #[derive(Parser, Debug)]
@@ -32,6 +33,14 @@ struct Args {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+
+    // Run CUDA initialization test first
+    println!("Running CUDA initialization test...");
+    if let Err(e) = cuda_test::test_cuda_init() {
+        eprintln!("CUDA initialization test failed: {:?}", e);
+        process::exit(1);
+    }
+    println!("CUDA initialization test completed successfully\n");
 
     // Load the BIP39 wordlist from file
     let wordlist_content = fs::read_to_string(&args.wordlist)
