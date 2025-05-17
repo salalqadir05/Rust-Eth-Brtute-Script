@@ -15,13 +15,8 @@ pub fn test_cuda_init() -> Result<()> {
                 match Device::get_device(0) {
                     Ok(device) => {
                         println!("Successfully got device 0");
+                        // Just print basic device info that we know exists
                         println!("Device name: {}", device.name()?);
-                        // Get compute capability using device properties
-                        let props = device.properties()?;
-                        println!("Compute capability: {}.{}", 
-                            props.major,
-                            props.minor);
-                        println!("Total memory: {} MB", props.total_global_mem / 1024 / 1024);
                     },
                     Err(e) => println!("Failed to get device 0: {}", e),
                 }
