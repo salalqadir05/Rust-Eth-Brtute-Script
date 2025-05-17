@@ -3,8 +3,13 @@
 #include <stdio.h>
 #include <string.h>
 
-// BIP39 wordlist in constant memory
-__device__ __constant__ char wordlist[2048][10];
+// BIP39 wordlist in constant memory with new GpuWord format
+struct GpuWord {
+    char bytes[10];  // 9 chars + null terminator
+    uint8_t len;
+};
+
+__device__ __constant__ GpuWord wordlist[2048];
 
 // SHA-512 Constants
 __device__ __constant__ uint64_t K[80] = {
@@ -617,20 +622,25 @@ __device__ uint32_t to_u32(const uint8_t* p) {
            ((uint32_t)p[3]);
 }
 
-// BIP39 Checksum Validator
-__device__ bool validate_bip39_checksum(const uint16_t* word_indices) {
+// Update the word indices structure to ensure proper alignment
+struct WordIndices {
+    uint16_t indices[12];
+};
+
+// Update the validate_bip39_checksum function signature
+__device__ bool validate_bip39_checksum(const WordIndices* word_indices) {
     uint8_t entropy[16] = {0};
     for (int i = 0; i < 128; i++) {
         int word_idx = i / 11;
         int bit_idx = 10 - (i % 11);
-        if (word_indices[word_idx] & (1 << bit_idx)) {
+        if (word_indices->indices[word_idx] & (1 << bit_idx)) {
             entropy[i / 8] |= (1 << (7 - (i % 8)));
         }
     }
     uint8_t hash[32];
     sha256(entropy, 16, hash);
     uint8_t checksum_expected = hash[0] >> 4;
-    uint8_t checksum_actual = word_indices[11] & 0xF;
+    uint8_t checksum_actual = word_indices->indices[11] & 0xF;
     return checksum_expected == checksum_actual;
 }
 
@@ -681,7 +691,7 @@ __global__ void kernel_wordlist_lookup(char* candidates, int candidate_count, in
         for (int i = 0; i < 2048; i++) {
             bool match = true;
             for (int j = 0; j < 10; j++) {
-                if (candidate[j] != wordlist[i][j]) {
+                if (candidate[j] != wordlist[i].bytes[j]) {
                     match = false;
                     break;
                 }
@@ -744,39 +754,45 @@ __global__ void kernel_validate_mnemonic(int* word_indices, int phrase_len, int 
 
 // Main GPU Kernel
 extern "C" __global__ void search_seeds(
-    uint64_t* seeds_tested,
-    uint64_t* seeds_found,
-    uint64_t  start_index,
-    uint64_t  batch_size,
-    int       wordlist_len,
-    int       known_count,
-    const int* known_indices,
-    const uint8_t* target_address,
-    int       match_mode,
-    int       match_prefix_len
+    uint64_t* d_seeds_tested,
+    uint64_t* d_seeds_found,
+    uint64_t start_offset,
+    uint64_t batch_size,
+    int wordlist_len,
+    int known_count,
+    const int* d_known,
+    const uint8_t* d_address,
+    int match_mode,
+    int match_prefix_len,
+    int* d_found_mnemonic
 ) {
     uint64_t tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= batch_size) return;
-    uint64_t idx = start_index + tid;
-    int word_indices[12];
+    uint64_t idx = start_offset + tid;
+    
+    // Use properly aligned structure
+    WordIndices word_indices;
     #pragma unroll
     for (int i = 0; i < known_count; i++) {
-        word_indices[i] = known_indices[i];
+        word_indices.indices[i] = (uint16_t)d_known[i];
     }
     uint64_t rem = idx;
     for (int pos = known_count; pos < 12; pos++) {
-        word_indices[pos] = rem % 2048;
+        word_indices.indices[pos] = (uint16_t)(rem % 2048);
         rem /= 2048;
     }
-    uint8_t mnemonic[256];
-    int mnemonic_len = 0;
-    if (!validate_bip39_checksum((uint16_t*)word_indices)) {
-        atomicAdd((unsigned long long*)seeds_tested, 1ULL);
+
+    // Validate checksum with proper alignment
+    if (!validate_bip39_checksum(&word_indices)) {
+        atomicAdd((unsigned long long*)d_seeds_tested, 1ULL);
         return;
     }
+
+    uint8_t mnemonic[256];
+    int mnemonic_len = 0;
     #pragma unroll
     for (int i = 0; i < 12; i++) {
-        const char* w = wordlist[word_indices[i]];
+        const char* w = wordlist[word_indices.indices[i]].bytes;
         for (int j = 0; w[j] != '\0'; j++) {
             mnemonic[mnemonic_len++] = w[j];
         }
@@ -815,20 +831,27 @@ extern "C" __global__ void search_seeds(
     ec_scalar_mul(pubkey_x, pubkey_y, priv_scalar);
     uint8_t eth_addr[20];
     pubkey_to_eth_address(eth_addr, pubkey_x, pubkey_y);
+
+    // Add bounds checking for match_prefix_len
+    int actual_prefix_len = (match_prefix_len < 0) ? 0 : 
+                           (match_prefix_len > 20) ? 20 : 
+                           match_prefix_len;
+
     bool match = true;
     if (match_mode == 0) {
         for (int i = 0; i < 20; i++)
-            if (eth_addr[i] != target_address[i]) { match = false; break; }
+            if (eth_addr[i] != d_address[i]) { match = false; break; }
     } else if (match_mode == 1) {
-        for (int i = 0; i < match_prefix_len; i++)
-            if (eth_addr[i] != target_address[i]) { match = false; break; }
+        for (int i = 0; i < actual_prefix_len; i++)
+            if (eth_addr[i] != d_address[i]) { match = false; break; }
     } else {
         for (int i = 0; i < 20; i++)
             if (eth_addr[i] != 0x00) { match = false; break; }
     }
     if (match) {
         printf("[FOUND] Mnemonic: %s\n", mnemonic);
-        atomicAdd((unsigned long long*)seeds_found, 1ULL);
+        atomicAdd((unsigned long long*)d_seeds_found, 1ULL);
+        d_found_mnemonic[tid] = 1;
     }
-    atomicAdd((unsigned long long*)seeds_tested, 1ULL);
+    atomicAdd((unsigned long long*)d_seeds_tested, 1ULL);
 }

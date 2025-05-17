@@ -19,12 +19,27 @@ lazy_static::lazy_static! {
     static ref CUDA_CONTEXT: Mutex<Option<(Arc<CudaContext>, Arc<Module>)>> = Mutex::new(None);
 }
 
+// Fixed-size word structure for GPU
+#[repr(C)]
+#[derive(Clone, Copy, DeviceCopy)]
+struct GpuWord {
+    bytes: [u8; 10],  // 9 chars + null terminator
+    len: u8,
+}
+
+// Word indices structure matching CUDA
+#[repr(C)]
+#[derive(Clone, Copy, DeviceCopy)]
+struct WordIndices {
+    indices: [u16; 12],
+}
+
 pub struct GpuWorker {
     module: Arc<Module>,
     function_name: String,
     stream: Stream,
     wordlist_len: i32,
-    known_indices: Vec<i32>,
+    known_indices: Vec<u16>,  // Changed from i32 to u16 to match CUDA
     known_count: i32,
     target_address: Vec<u8>,
     match_mode: i32,
@@ -37,6 +52,21 @@ pub struct GpuWorker {
 fn get_bip39_wordlist() -> Vec<String> {
     let content = include_str!("../words.txt");
     content.lines().map(|l| l.to_string()).collect()
+}
+
+fn convert_wordlist_to_gpu_format(wordlist: &[String]) -> Vec<GpuWord> {
+    let mut gpu_words = Vec::with_capacity(wordlist.len());
+    for word in wordlist {
+        let mut gpu_word = GpuWord {
+            bytes: [0u8; 10],
+            len: word.len() as u8,
+        };
+        let bytes = word.as_bytes();
+        let len = bytes.len().min(9);
+        gpu_word.bytes[..len].copy_from_slice(&bytes[..len]);
+        gpu_words.push(gpu_word);
+    }
+    gpu_words
 }
 
 pub fn init_gpu_context(device_id: u32) -> Result<(Arc<CudaContext>, Arc<Module>)> {
@@ -58,21 +88,24 @@ pub fn init_gpu_context(device_id: u32) -> Result<(Arc<CudaContext>, Arc<Module>
     let context = Arc::new(CudaContext::new(device)
         .with_context(|| format!("Failed to create CUDA context for device {}", device_id))?);
 
+    // Load PTX module
     let ptx = include_str!("gpu_kernel.ptx");
-    let ptx_cstr = CString::new(ptx)
-        .with_context(|| "PTX contains null byte")?;
-    let module = Arc::new(Module::from_ptx(ptx_cstr.as_c_str(), &[])
+    let module = Arc::new(Module::from_ptx(ptx, &[])
         .context("Failed to load PTX module")?);
 
+    // Convert wordlist to GPU format and copy to device
     let wordlist = get_bip39_wordlist();
-    let wordlist_buffer = DeviceBuffer::from_slice(&wordlist)
+    let gpu_words = convert_wordlist_to_gpu_format(&wordlist);
+    let wordlist_buffer = DeviceBuffer::from_slice(&gpu_words)
         .context("Failed to copy wordlist to device")?;
 
+    // Copy wordlist to global memory
     let symbol_name = CString::new("wordlist").unwrap();
-    let mut symbol: Symbol<[u8; 20480]> = module.get_global(&symbol_name)
+    let mut symbol: Symbol<[GpuWord; 2048]> = module.get_global(&symbol_name)
         .with_context(|| "Failed to get symbol 'wordlist' from module")?;
+    
     unsafe {
-        symbol.copy_from(&wordlist_buffer)
+        symbol.copy_from(&gpu_words)
             .with_context(|| "Failed to copy wordlist to device")?;
     }
 
@@ -94,6 +127,14 @@ impl GpuWorker {
         total_workers: u32,
         resume_from: u64,
     ) -> Result<Self> {
+        // Validate match_mode
+        if match_mode < 0 || match_mode > 2 {
+            anyhow::bail!("Invalid match_mode: must be 0, 1, or 2");
+        }
+
+        // Validate match_prefix_len
+        let match_prefix_len = match_prefix_len.clamp(0, 20);
+
         let offset_file = format!("worker{}.offset", worker_id);
         let resume_offset = if Path::new(&offset_file).exists() {
             let content = fs::read_to_string(&offset_file)?;
@@ -102,14 +143,25 @@ impl GpuWorker {
             resume_from
         };
 
-        let known_indices: Vec<i32> = known_words.iter().map(|w| {
+        let known_indices: Vec<u16> = known_words.iter().map(|w| {
             wordlist.iter().position(|x| x == w)
                 .ok_or_else(|| anyhow::anyhow!("Unknown seed word '{}'", w))
-                .map(|idx| idx as i32)
-        }).collect::<Result<Vec<i32>>>()?;
+                .map(|idx| idx as u16)
+        }).collect::<Result<Vec<u16>>>()?;
+
+        // Validate known words count
+        if known_indices.len() > 12 {
+            anyhow::bail!("Too many known words: maximum is 12");
+        }
+
         let known_count = known_indices.len() as i32;
 
+        // Validate address format
         let addr_str = address.strip_prefix("0x").unwrap_or(address);
+        if addr_str.len() != 40 {
+            anyhow::bail!("Invalid address length: must be 40 hex characters");
+        }
+
         let mut target_address = Vec::with_capacity(addr_str.len() / 2);
         for i in 0..(addr_str.len() / 2) {
             let byte = u8::from_str_radix(&addr_str[2 * i..2 * i + 2], 16)
@@ -204,7 +256,7 @@ impl GpuWorker {
                 d_found_mnemonic.copy_to(&mut mnemonic_indices)?;
 
                 let wordlist = get_bip39_wordlist();
-                let mut mnemonic_words = Vec::new();
+                let mut mnemonic_words = Vec::with_capacity(12);
 
                 let mut ki = 0;
                 let mut ui = 0;
@@ -213,7 +265,11 @@ impl GpuWorker {
                         mnemonic_words.push(wordlist[self.known_indices[ki] as usize].clone());
                         ki += 1;
                     } else {
-                        mnemonic_words.push(wordlist[mnemonic_indices[ui] as usize].clone());
+                        let idx = mnemonic_indices[ui] as usize;
+                        if idx >= wordlist.len() {
+                            anyhow::bail!("Invalid word index found: {}", idx);
+                        }
+                        mnemonic_words.push(wordlist[idx].clone());
                         ui += 1;
                     }
                 }
