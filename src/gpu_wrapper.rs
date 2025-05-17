@@ -13,7 +13,7 @@ use std::time::Instant;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-
+use cust::DeviceCopy;
 // Global CUDA context and module
 lazy_static::lazy_static! {
     static ref CUDA_CONTEXT: Mutex<Option<(Arc<CudaContext>, Arc<Module>)>> = Mutex::new(None);
@@ -87,6 +87,8 @@ pub fn init_gpu_context(device_id: u32) -> Result<(Arc<CudaContext>, Arc<Module>
         .with_context(|| format!("Failed to get device {}", device_id))?;
     let context = Arc::new(CudaContext::new(device)
         .with_context(|| format!("Failed to create CUDA context for device {}", device_id))?);
+  context.set_flags(cust::context::ContextFlags::SCHED_AUTO)
+        .with_context(|| "Failed to set context flags")?;
 
     // Load PTX module
     let ptx = include_str!("gpu_kernel.ptx");
@@ -96,8 +98,13 @@ pub fn init_gpu_context(device_id: u32) -> Result<(Arc<CudaContext>, Arc<Module>
     // Convert wordlist to GPU format and copy to device
     let wordlist = get_bip39_wordlist();
     let gpu_words = convert_wordlist_to_gpu_format(&wordlist);
-    let wordlist_buffer = DeviceBuffer::from_slice(&gpu_words)
-        .context("Failed to copy wordlist to device")?;
+    let mut wordlist_array: [GpuWord; 2048] = [GpuWord { bytes: [0; 10], len: 0 }; 2048];
+    for (i, word) in gpu_words.into_iter().enumerate() {
+        if i >= 2048 {
+            break;
+        }
+        wordlist_array[i] = word;
+    }
 
     // Copy wordlist to global memory
     let symbol_name = CString::new("wordlist").unwrap();
@@ -105,7 +112,7 @@ pub fn init_gpu_context(device_id: u32) -> Result<(Arc<CudaContext>, Arc<Module>
         .with_context(|| "Failed to get symbol 'wordlist' from module")?;
     
     unsafe {
-        symbol.copy_from(&gpu_words)
+        symbol.copy_from(&wordlist_array)
             .with_context(|| "Failed to copy wordlist to device")?;
     }
 
@@ -218,9 +225,9 @@ impl GpuWorker {
             // Get function for this iteration
             let function = self.module.get_function(&self.function_name)
                 .with_context(|| "Failed to get 'search_seeds' function")?;
-            
+            let stream = &self.stream;
             unsafe {
-                launch!(function<<<blocks, threads, 0, &self.stream>>>(
+                launch!(function<<<blocks, threads, 0, stream>>>(
                     d_seeds_tested.as_device_ptr(),
                     d_seeds_found.as_device_ptr(),
                     current_offset,

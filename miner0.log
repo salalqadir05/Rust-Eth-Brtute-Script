@@ -1,3 +1,9 @@
+Running CUDA initialization test...
+Testing CUDA initialization...
+Failed to get device count: "initialization error"
+Failed to get device for context creation: "initialization error"
+CUDA initialization test completed successfully
+
 Worker 0 error: init_gpu_context(0) failed
 
 Caused by:
