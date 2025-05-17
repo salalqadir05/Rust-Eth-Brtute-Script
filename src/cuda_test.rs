@@ -30,17 +30,16 @@ fn check_cuda_libraries() -> Result<()> {
         if stdout.contains(lib) {
             println!("Found {}", lib);
             // Try to get the actual path
-            if let Ok(path) = Command::new("ldconfig")
+            if let Ok(output) = Command::new("ldconfig")
                 .arg("-p")
                 .output()
-                .and_then(|o| Ok(String::from_utf8_lossy(&o.stdout).to_string()))
-                .and_then(|s| {
-                    s.lines()
-                        .find(|l| l.contains(lib))
-                        .map(|l| l.split("=>").nth(1).unwrap_or("").trim().to_string())
-                        .ok_or_else(|| anyhow::anyhow!("Path not found"))
-                }) {
-                println!("  Path: {}", path);
+            {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                if let Some(line) = stdout.lines().find(|l| l.contains(lib)) {
+                    if let Some(path) = line.split("=>").nth(1) {
+                        println!("  Path: {}", path.trim());
+                    }
+                }
             }
         } else {
             println!("{} not found", lib);

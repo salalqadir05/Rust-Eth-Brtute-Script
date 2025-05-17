@@ -5,6 +5,7 @@ use cust::function::Function;
 use cust::module::{Module, Symbol};
 use cust::prelude::*;
 use cust::stream::{Stream, StreamFlags};
+use cust::memory::DeviceBuffer;
 use std::ffi::CString;
 use std::sync::Arc;
 use std::fs;
@@ -60,23 +61,18 @@ pub fn init_gpu_context(device_id: u32) -> Result<(Arc<CudaContext>, Arc<Module>
     let ptx = include_str!("gpu_kernel.ptx");
     let ptx_cstr = CString::new(ptx)
         .with_context(|| "PTX contains null byte")?;
-    let module = Arc::new(Module::load_from_string(ptx_cstr.as_c_str())
-        .with_context(|| "Failed to load PTX module")?);
+    let module = Arc::new(Module::from_ptx(ptx_cstr.as_c_str(), &[])
+        .context("Failed to load PTX module")?);
 
     let wordlist = get_bip39_wordlist();
-    let mut host_words = [0u8; 20480]; // 2048 words * 10 bytes
-    for (i, word) in wordlist.iter().enumerate().take(2048) {
-        let bytes = word.as_bytes();
-        let len = bytes.len().min(9);
-        host_words[i * 10..i * 10 + len].copy_from_slice(&bytes[..len]);
-        host_words[i * 10 + len] = 0;
-    }
+    let wordlist_buffer = DeviceBuffer::from_slice(&wordlist)
+        .context("Failed to copy wordlist to device")?;
 
     let symbol_name = CString::new("wordlist").unwrap();
     let mut symbol: Symbol<[u8; 20480]> = module.get_global(&symbol_name)
         .with_context(|| "Failed to get symbol 'wordlist' from module")?;
     unsafe {
-        symbol.copy_from(&host_words)
+        symbol.copy_from(&wordlist_buffer)
             .with_context(|| "Failed to copy wordlist to device")?;
     }
 
