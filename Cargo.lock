@@ -1197,6 +1197,7 @@ dependencies = [
  "cust",
  "env_logger",
  "ethers-core",
+ "lazy_static",
  "log",
  "serde",
  "serde_json",

@@ -11,6 +11,12 @@ use std::fs;
 use std::time::Instant;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
+
+// Global CUDA context and module
+lazy_static::lazy_static! {
+    static ref CUDA_CONTEXT: Mutex<Option<(CudaContext, Module)>> = Mutex::new(None);
+}
 
 pub struct GpuWorker<'m> {
     function: Function<'m>,
@@ -32,6 +38,14 @@ fn get_bip39_wordlist() -> Vec<String> {
 }
 
 pub fn init_gpu_context(device_id: u32) -> Result<(CudaContext, Module)> {
+    let mut context_guard = CUDA_CONTEXT.lock().unwrap();
+    
+    // If context already exists, return it
+    if let Some((ctx, module)) = context_guard.as_ref() {
+        return Ok((ctx.clone(), module.clone()));
+    }
+
+    // Otherwise create new context
     let device_count = Device::num_devices()
         .with_context(|| "Failed to get number of CUDA devices")?;
     if device_id as usize >= device_count.try_into().unwrap() {
@@ -65,6 +79,8 @@ pub fn init_gpu_context(device_id: u32) -> Result<(CudaContext, Module)> {
             .with_context(|| "Failed to copy wordlist to device")?;
     }
 
+    // Store the context and module
+    *context_guard = Some((context.clone(), module.clone()));
     Ok((context, module))
 }
 

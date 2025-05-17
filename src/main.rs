@@ -85,8 +85,8 @@ fn main() -> Result<()> {
                     .unwrap_or(0);
 
                 // Initialize GPU
-                let (ctx, module) = gpu_wrapper::init_gpu_context(worker_id)
-                    .with_context(|| format!("init_gpu_context({}) failed", worker_id))?;
+                let (ctx, module) = gpu_wrapper::init_gpu_context(0)
+                    .with_context(|| format!("init_gpu_context(0) failed"))?;
 
                 // Create worker
                 let mut worker = GpuWorker::new(
