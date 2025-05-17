@@ -91,8 +91,8 @@ fi
 export CUDA_PATH="/usr/local/cuda-11.8"
 export PATH="$CUDA_PATH/bin:$PATH"
 
-# Set LD_LIBRARY_PATH with CUDA libraries first
-export LD_LIBRARY_PATH="/usr/local/cuda-11.8/targets/x86_64-linux/lib:/usr/lib/x86_64-linux-gnu:/home/salal/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib:/home/salal/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib"
+# Set LD_LIBRARY_PATH with CUDA libraries first, removing Rust target directories
+export LD_LIBRARY_PATH="/usr/local/cuda-11.8/targets/x86_64-linux/lib:/usr/lib/x86_64-linux-gnu:/home/salal/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib"
 
 # Additional CUDA environment variables
 export CUDA_HOME="$CUDA_PATH"
