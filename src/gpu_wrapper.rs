@@ -18,8 +18,9 @@ lazy_static::lazy_static! {
     static ref CUDA_CONTEXT: Mutex<Option<(Arc<CudaContext>, Arc<Module>)>> = Mutex::new(None);
 }
 
-pub struct GpuWorker<'m> {
-    function: Function<'m>,
+pub struct GpuWorker {
+    module: Arc<Module>,
+    function_name: CString,
     stream: Stream,
     wordlist_len: i32,
     known_indices: Vec<i32>,
@@ -30,7 +31,6 @@ pub struct GpuWorker<'m> {
     worker_id: u32,
     total_workers: u32,
     resume_from: u64,
-    _module: Arc<Module>, // Keep module alive
 }
 
 fn get_bip39_wordlist() -> Vec<String> {
@@ -85,7 +85,7 @@ pub fn init_gpu_context(device_id: u32) -> Result<(Arc<CudaContext>, Arc<Module>
     Ok((context, module))
 }
 
-impl<'m> GpuWorker<'m> {
+impl GpuWorker {
     pub fn new(
         _ctx: &CudaContext,
         module: Arc<Module>,
@@ -121,13 +121,14 @@ impl<'m> GpuWorker<'m> {
             target_address.push(byte);
         }
 
-        let function = module.get_function("search_seeds")
-            .with_context(|| "Failed to get 'search_seeds' function")?;
+        let function_name = CString::new("search_seeds")
+            .with_context(|| "Failed to create function name string")?;
         let stream = Stream::new(StreamFlags::NON_BLOCKING, None)
             .with_context(|| "Failed to create CUDA stream")?;
 
         Ok(Self {
-            function,
+            module,
+            function_name,
             stream,
             wordlist_len: wordlist.len() as i32,
             known_indices,
@@ -138,7 +139,6 @@ impl<'m> GpuWorker<'m> {
             worker_id,
             total_workers,
             resume_from: resume_offset,
-            _module: module,
         })
     }
 
@@ -167,10 +167,13 @@ impl<'m> GpuWorker<'m> {
 
             let batch_remaining = batch_size * (self.worker_id as u64 + 1) - current_offset;
             let current_batch_size = std::cmp::min(batch_remaining, batch_size);
-            let func = &self.function;
-            let stream = &self.stream;
+            
+            // Get function for this iteration
+            let function = self.module.get_function(&self.function_name)
+                .with_context(|| "Failed to get 'search_seeds' function")?;
+            
             unsafe {
-                launch!(func<<<blocks, threads, 0, stream>>>(
+                launch!(function<<<blocks, threads, 0, &self.stream>>>(
                     d_seeds_tested.as_device_ptr(),
                     d_seeds_found.as_device_ptr(),
                     current_offset,
@@ -210,7 +213,7 @@ impl<'m> GpuWorker<'m> {
 
                 let mut ki = 0;
                 let mut ui = 0;
-                for i in 0..12 {
+                for _i in 0..12 {
                     if ki < self.known_count as usize {
                         mnemonic_words.push(wordlist[self.known_indices[ki] as usize].clone());
                         ki += 1;
