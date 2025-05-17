@@ -88,18 +88,18 @@ if [ ! -d "$CUDA_LIB_PATH" ]; then
 fi
 
 # Set environment variables
-export CUDA_PATH
+export CUDA_PATH="/usr/local/cuda-11.8"
 export PATH="$CUDA_PATH/bin:$PATH"
 
-# Set LD_LIBRARY_PATH with CUDA libraries first, then system libraries
-export LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu:/home/salal/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib:/home/salal/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib"
+# Set LD_LIBRARY_PATH with CUDA libraries first
+export LD_LIBRARY_PATH="/usr/local/cuda-11.8/targets/x86_64-linux/lib:/usr/lib/x86_64-linux-gnu:/home/salal/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib:/home/salal/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib"
 
 # Additional CUDA environment variables
 export CUDA_HOME="$CUDA_PATH"
 export CUDA_INC_PATH="$CUDA_PATH/include"
-export CUDA_LIBRARY_PATH="$CUDA_LIB_PATH"
-export CUDA_RUNTIME_LIBRARY_PATH="$CUDA_LIB_PATH"
-export CUDA_DRIVER_LIBRARY_PATH="$CUDA_LIB_PATH"
+export CUDA_LIBRARY_PATH="$CUDA_PATH/targets/x86_64-linux/lib"
+export CUDA_RUNTIME_LIBRARY_PATH="$CUDA_PATH/targets/x86_64-linux/lib"
+export CUDA_DRIVER_LIBRARY_PATH="$CUDA_PATH/targets/x86_64-linux/lib"
 
 # Set specific version for cust crate
 export CUDA_TOOLKIT_ROOT_DIR="$CUDA_PATH"
