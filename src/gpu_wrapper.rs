@@ -20,7 +20,7 @@ lazy_static::lazy_static! {
 
 pub struct GpuWorker {
     module: Arc<Module>,
-    function_name: CString,
+    function_name: String,
     stream: Stream,
     wordlist_len: i32,
     known_indices: Vec<i32>,
@@ -121,8 +121,7 @@ impl GpuWorker {
             target_address.push(byte);
         }
 
-        let function_name = CString::new("search_seeds")
-            .with_context(|| "Failed to create function name string")?;
+        let function_name = "search_seeds".to_string();
         let stream = Stream::new(StreamFlags::NON_BLOCKING, None)
             .with_context(|| "Failed to create CUDA stream")?;
 
