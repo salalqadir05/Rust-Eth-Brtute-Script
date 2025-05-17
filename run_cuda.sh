@@ -6,10 +6,40 @@ echo "Setting up CUDA environment..."
 # Function to check if a directory exists
 check_dir() {
     if [ ! -d "$1" ]; then
-        echo "Error: Directory $1 does not exist"
         return 1
     fi
     return 0
+}
+
+# Function to find CUDA installation
+find_cuda_path() {
+    # Common CUDA installation paths on Debian/Ubuntu
+    local possible_paths=(
+        "/usr/local/cuda-11.8"
+        "/usr/local/cuda"
+        "/usr/lib/cuda"
+        "/usr/lib/nvidia-cuda-toolkit"
+        "/usr/lib/nvidia-cuda"
+    )
+
+    for path in "${possible_paths[@]}"; do
+        if check_dir "$path"; then
+            echo "$path"
+            return 0
+        fi
+    done
+
+    # If not found in common paths, try to find using nvcc
+    if command -v nvcc &> /dev/null; then
+        local nvcc_path=$(which nvcc)
+        local cuda_path=$(dirname $(dirname "$nvcc_path"))
+        if check_dir "$cuda_path"; then
+            echo "$cuda_path"
+            return 0
+        fi
+    fi
+
+    return 1
 }
 
 # Check if CUDA is installed
@@ -35,21 +65,26 @@ if ! nvidia-smi; then
     exit 1
 fi
 
-# Set CUDA paths
-CUDA_PATH="/usr/local/cuda-11.8"
-CUDA_LIB_PATH="$CUDA_PATH/lib64"
-
-# Verify CUDA installation paths
-if ! check_dir "$CUDA_PATH"; then
-    echo "Error: CUDA installation not found at $CUDA_PATH"
+# Find CUDA installation
+echo -e "\nSearching for CUDA installation..."
+CUDA_PATH=$(find_cuda_path)
+if [ -z "$CUDA_PATH" ]; then
+    echo "Error: Could not find CUDA installation"
     echo "Please verify your CUDA installation"
     exit 1
 fi
 
-if ! check_dir "$CUDA_LIB_PATH"; then
-    echo "Error: CUDA libraries not found at $CUDA_LIB_PATH"
-    echo "Please verify your CUDA installation"
-    exit 1
+echo "Found CUDA installation at: $CUDA_PATH"
+
+# Set CUDA paths
+CUDA_LIB_PATH="$CUDA_PATH/lib64"
+if [ ! -d "$CUDA_LIB_PATH" ]; then
+    # Try alternative lib path
+    CUDA_LIB_PATH="$CUDA_PATH/lib"
+    if [ ! -d "$CUDA_LIB_PATH" ]; then
+        echo "Error: Could not find CUDA libraries directory"
+        exit 1
+    fi
 fi
 
 # Set environment variables
