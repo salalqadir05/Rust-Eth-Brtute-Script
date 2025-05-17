@@ -90,7 +90,9 @@ fi
 # Set environment variables
 export CUDA_PATH
 export PATH="$CUDA_PATH/bin:$PATH"
-export LD_LIBRARY_PATH="$CUDA_LIB_PATH:$LD_LIBRARY_PATH"
+
+# Set LD_LIBRARY_PATH with CUDA libraries first, then system libraries
+export LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu:/home/salal/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib:/home/salal/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib"
 
 # Additional CUDA environment variables
 export CUDA_HOME="$CUDA_PATH"
