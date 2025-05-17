@@ -1,0 +1,6 @@
+Worker 0 error: init_gpu_context(0) failed
+
+Caused by:
+    0: Failed to get number of CUDA devices
+    1: "initialization error"
+❌ Search completed; no matching mnemonic found.
