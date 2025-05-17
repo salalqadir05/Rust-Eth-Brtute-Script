@@ -91,7 +91,7 @@ fn main() -> Result<()> {
                 // Create worker
                 let mut worker = GpuWorker::new(
                     &ctx,
-                    &module,
+                    module,
                     wordlist,
                     known_words,
                     &address,

@@ -15,7 +15,7 @@ use std::sync::Mutex;
 
 // Global CUDA context and module
 lazy_static::lazy_static! {
-    static ref CUDA_CONTEXT: Mutex<Option<(CudaContext, Module)>> = Mutex::new(None);
+    static ref CUDA_CONTEXT: Mutex<Option<(Arc<CudaContext>, Arc<Module>)>> = Mutex::new(None);
 }
 
 pub struct GpuWorker<'m> {
@@ -30,6 +30,7 @@ pub struct GpuWorker<'m> {
     worker_id: u32,
     total_workers: u32,
     resume_from: u64,
+    _module: Arc<Module>, // Keep module alive
 }
 
 fn get_bip39_wordlist() -> Vec<String> {
@@ -37,12 +38,12 @@ fn get_bip39_wordlist() -> Vec<String> {
     content.lines().map(|l| l.to_string()).collect()
 }
 
-pub fn init_gpu_context(device_id: u32) -> Result<(CudaContext, Module)> {
+pub fn init_gpu_context(device_id: u32) -> Result<(Arc<CudaContext>, Arc<Module>)> {
     let mut context_guard = CUDA_CONTEXT.lock().unwrap();
     
     // If context already exists, return it
     if let Some((ctx, module)) = context_guard.as_ref() {
-        return Ok((ctx.clone(), module.clone()));
+        return Ok((Arc::clone(ctx), Arc::clone(module)));
     }
 
     // Otherwise create new context
@@ -53,14 +54,14 @@ pub fn init_gpu_context(device_id: u32) -> Result<(CudaContext, Module)> {
     }
     let device = Device::get_device(device_id)
         .with_context(|| format!("Failed to get device {}", device_id))?;
-    let context = CudaContext::new(device)
-        .with_context(|| format!("Failed to create CUDA context for device {}", device_id))?;
+    let context = Arc::new(CudaContext::new(device)
+        .with_context(|| format!("Failed to create CUDA context for device {}", device_id))?);
 
     let ptx = include_str!("gpu_kernel.ptx");
     let ptx_cstr = CString::new(ptx)
         .with_context(|| "PTX contains null byte")?;
-    let module = Module::load_from_string(ptx_cstr.as_c_str())
-        .with_context(|| "Failed to load PTX module")?;
+    let module = Arc::new(Module::load_from_string(ptx_cstr.as_c_str())
+        .with_context(|| "Failed to load PTX module")?);
 
     let wordlist = get_bip39_wordlist();
     let mut host_words = [0u8; 20480]; // 2048 words * 10 bytes
@@ -80,14 +81,14 @@ pub fn init_gpu_context(device_id: u32) -> Result<(CudaContext, Module)> {
     }
 
     // Store the context and module
-    *context_guard = Some((context.clone(), module.clone()));
+    *context_guard = Some((Arc::clone(&context), Arc::clone(&module)));
     Ok((context, module))
 }
 
 impl<'m> GpuWorker<'m> {
     pub fn new(
         _ctx: &CudaContext,
-        module: &'m Module,
+        module: Arc<Module>,
         wordlist: Arc<Vec<String>>,
         known_words: Arc<Vec<String>>,
         address: &String,
@@ -137,6 +138,7 @@ impl<'m> GpuWorker<'m> {
             worker_id,
             total_workers,
             resume_from: resume_offset,
+            _module: module,
         })
     }
 
