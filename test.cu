@@ -19,4 +19,4 @@ int main() {
         printf("  Total Memory: %lu MB\n", prop.totalGlobalMem / (1024*1024));
     }
     return 0;
-} 
+}

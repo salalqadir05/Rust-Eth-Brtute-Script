@@ -1,129 +1,79 @@
-#!/bin/bash
-set -e  # Exit on error
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo "Setting up CUDA environment..."
+# run_cuda.sh: Comprehensive CUDA environment & device initialization checker
+# Usage: chmod +x run_cuda.sh && ./run_cuda.sh
 
-# Function to check if a directory exists
-check_dir() {
-    if [ ! -d "$1" ]; then
-        return 1
-    fi
-    return 0
+echo "\n=== 1. NVIDIA driver & GPU visibility (nvidia-smi) ==="
+if ! command -v nvidia-smi &>/dev/null; then
+  echo "Error: nvidia-smi not found. Install NVIDIA drivers."
+else
+  nvidia-smi
+fi
+
+echo "\n=== 2. CUDA compiler (nvcc) version ==="
+if ! command -v nvcc &>/dev/null; then
+  echo "Error: nvcc not found. Install CUDA Toolkit."
+else
+  nvcc --version
+fi
+
+echo "\n=== 3. Loaded NVIDIA kernel modules ==="
+lsmod | grep -E 'nvidia(_uvm|_drm)?' || echo "Warning: NVIDIA kernel modules not loaded"
+
+echo "\n=== 4. /dev/nvidia* device nodes & permissions ==="
+if ls /dev/nvidia* &>/dev/null; then
+  ls -l /dev/nvidia* || true
+else
+  echo "Warning: No /dev/nvidia* device files found"
+fi
+
+echo "\n=== 5. User groups for video/render access ==="
+if groups "$USER" | grep -Eq '\b(video|render)\b'; then
+  echo "OK: User '$USER' is in video/render group"
+else
+  echo "Warning: User '$USER' not in video or render group"
+  echo "  -> add with: sudo usermod -aG video $USER"
+fi
+
+echo "\n=== 6. LD_LIBRARY_PATH & cuda .so visibility ==="
+echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+echo "ldconfig cache for libcudart.so:"
+ldconfig -p | grep libcudart || echo "Warning: libcudart not in ldconfig"
+
+echo "\n=== 7. Scan for conflicting CUDA lib versions ==="
+find /usr/local/cuda* /usr/lib/x86_64-linux-gnu -maxdepth 2 -type f -name "libcudart.so*" 2>/dev/null | sed 's/^/  /'
+
+echo "\n=== 8. Test CUDA device query sample ==="
+# Try multiple sample paths
+for SAMPLE_DIR in "/usr/local/cuda/samples/1_Utilities/deviceQuery" \
+                  "/usr/local/cuda-*/samples/1_Utilities/deviceQuery" \
+                  "\$HOME/NVIDIA_CUDA-*/Samples/1_Utilities/deviceQuery"; do
+  SAMPLE_DIR_EXPANDED=$(echo $SAMPLE_DIR)
+  if [ -d "$SAMPLE_DIR_EXPANDED" ]; then
+    echo "Found sample at: $SAMPLE_DIR_EXPANDED"
+    (cd "$SAMPLE_DIR_EXPANDED" && make -j$(nproc) >/dev/null 2>&1 && echo "Running deviceQuery:" && "$SAMPLE_DIR_EXPANDED"/deviceQuery)
+    break
+  fi
+done || echo "Info: CUDA sample deviceQuery not found or failed to run"
+
+echo "\n=== 9. Minimal cuInit() test via C program ==="
+# Create & compile a minimal CUDA Driver API test in C
+cat << 'EOF' > /tmp/try_cuInit.c
+#include <stdio.h>
+#include <cuda.h>
+int main() {
+    CUresult r = cuInit(0);
+    if (r == CUDA_SUCCESS) printf("cuInit() succeeded\n");
+    else printf("cuInit() failed: %d\n", r);
+    return 0;
 }
-
-# Function to find CUDA installation
-find_cuda_path() {
-    # Common CUDA installation paths on Debian/Ubuntu
-    local possible_paths=(
-        "/usr/local/cuda-11.8"
-        "/usr/local/cuda"
-        "/usr/lib/cuda"
-        "/usr/lib/nvidia-cuda-toolkit"
-        "/usr/lib/nvidia-cuda"
-    )
-
-    for path in "${possible_paths[@]}"; do
-        if check_dir "$path"; then
-            echo "$path"
-            return 0
-        fi
-    done
-
-    # If not found in common paths, try to find using nvcc
-    if command -v nvcc &> /dev/null; then
-        local nvcc_path=$(which nvcc)
-        local cuda_path=$(dirname $(dirname "$nvcc_path"))
-        if check_dir "$cuda_path"; then
-            echo "$cuda_path"
-            return 0
-        fi
-    fi
-
-    return 1
-}
-
-# Check if CUDA is installed
-if ! command -v nvcc &> /dev/null; then
-    echo "Error: CUDA compiler (nvcc) not found"
-    echo "Please install CUDA toolkit:"
-    echo "sudo apt-get update"
-    echo "sudo apt-get install nvidia-cuda-toolkit"
-    exit 1
+EOF
+if command -v gcc &>/dev/null; then
+  gcc /tmp/try_cuInit.c -o /tmp/try_cuInit -lcuda && echo "Running cuInit() C test:" && /tmp/try_cuInit || echo "Error: cuInit() C test failed to compile or run"
+else
+  echo "Warning: gcc not found; skipping C cuInit() test"
 fi
 
-# Print CUDA version
-echo "CUDA Version:"
-if ! nvcc --version; then
-    echo "Error: Failed to get CUDA version"
-    exit 1
-fi
-
-# Check NVIDIA driver
-echo -e "\nNVIDIA Driver Status:"
-if ! nvidia-smi; then
-    echo "Error: Failed to get NVIDIA driver status"
-    exit 1
-fi
-
-# Find CUDA installation
-echo -e "\nSearching for CUDA installation..."
-CUDA_PATH=$(find_cuda_path)
-if [ -z "$CUDA_PATH" ]; then
-    echo "Error: Could not find CUDA installation"
-    echo "Please verify your CUDA installation"
-    exit 1
-fi
-
-echo "Found CUDA installation at: $CUDA_PATH"
-
-# Set CUDA paths
-CUDA_LIB_PATH="$CUDA_PATH/lib64"
-if [ ! -d "$CUDA_LIB_PATH" ]; then
-    # Try alternative lib path
-    CUDA_LIB_PATH="$CUDA_PATH/lib"
-    if [ ! -d "$CUDA_LIB_PATH" ]; then
-        echo "Error: Could not find CUDA libraries directory"
-        exit 1
-    fi
-fi
-
-# Set environment variables
-export CUDA_PATH="/usr/local/cuda-11.8"
-export PATH="$CUDA_PATH/bin:$PATH"
-
-# Set LD_LIBRARY_PATH with CUDA libraries first, removing Rust target directories
-export LD_LIBRARY_PATH="/usr/local/cuda-11.8/targets/x86_64-linux/lib:/usr/lib/x86_64-linux-gnu:/home/salal/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib"
-
-# Additional CUDA environment variables
-export CUDA_HOME="$CUDA_PATH"
-export CUDA_INC_PATH="$CUDA_PATH/include"
-export CUDA_LIBRARY_PATH="$CUDA_PATH/targets/x86_64-linux/lib"
-export CUDA_RUNTIME_LIBRARY_PATH="$CUDA_PATH/targets/x86_64-linux/lib"
-export CUDA_DRIVER_LIBRARY_PATH="$CUDA_PATH/targets/x86_64-linux/lib"
-
-# Set specific version for cust crate
-export CUDA_TOOLKIT_ROOT_DIR="$CUDA_PATH"
-export CUDA_TOOLKIT_VERSION="11.8"
-
-# Print environment
-echo -e "\nCUDA Environment:"
-echo "CUDA_PATH: $CUDA_PATH"
-echo "CUDA_HOME: $CUDA_HOME"
-echo "CUDA_TOOLKIT_ROOT_DIR: $CUDA_TOOLKIT_ROOT_DIR"
-echo "CUDA_TOOLKIT_VERSION: $CUDA_TOOLKIT_VERSION"
-echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
-
-# Verify cargo is installed
-if ! command -v cargo &> /dev/null; then
-    echo "Error: Cargo not found. Please install Rust and Cargo"
-    exit 1
-fi
-
-# Clean and rebuild
-echo -e "\nCleaning and rebuilding project..."
-cargo clean
-cargo build
-
-# Run the program
-echo -e "\nRunning program with CUDA environment..."
-RUST_BACKTRACE=1 cargo run "$@" 
+echo "\n=== 10. Summary ==="
+echo "If any warnings or errors occurred above, address them by installing drivers, loading modules, fixing permissions, or resolving library conflicts."

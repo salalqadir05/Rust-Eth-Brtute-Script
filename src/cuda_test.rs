@@ -30,7 +30,7 @@ fn check_cuda_libraries() -> Result<()> {
         .unwrap_or_else(|_| "11.8".to_string());
     println!("Expected CUDA version: {}", cuda_version);
 
-    let mut all_found = true;
+    let mut _all_found = true;
     for lib in cuda_libs.iter() {
         if stdout.contains(lib) {
             println!("Found {}", lib);
@@ -59,7 +59,7 @@ fn check_cuda_libraries() -> Result<()> {
             }
         } else {
             println!("{} not found", lib);
-            all_found = false;
+            _all_found = false;
         }
     }
 
@@ -113,7 +113,11 @@ pub fn test_cuda_init() -> Result<()> {
     }
     
     println!("\nAttempting CUDA device initialization...");
-    
+    cust::init(cust::CudaFlags::empty())?;
+
+    // Query the number of devices
+    let count = Device::num_devices()?;
+    println!("Number of CUDA devices: {}", count);
     // Try to get device count with error context
     let device_count = match Device::num_devices() {
         Ok(count) => {

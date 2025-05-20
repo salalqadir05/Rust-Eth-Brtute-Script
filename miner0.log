@@ -1,12 +1,168 @@
 Running CUDA initialization test...
 Testing CUDA initialization...
-Failed to get device count: "initialization error"
-Failed to get device for context creation: "initialization error"
+
+Environment Information:
+CUDA_PATH: Not set
+CUDA_HOME: /usr/local/cuda
+CUDA_TOOLKIT_ROOT_DIR: Not set
+CUDA_TOOLKIT_VERSION: Not set
+LD_LIBRARY_PATH: /usr/local/cuda/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib64:/lib
+
+Checking CUDA libraries...
+Expected CUDA version: 11.8
+Found libcudart.so
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcudart.so.11.0
+  Path: /usr/lib/x86_64-linux-gnu/libcudart.so.11.0
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcudart.so
+  Path: /usr/lib/x86_64-linux-gnu/libcudart.so
+  Available versions: 11.0, 11.0
+Found libcublas.so
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcublas.so.11
+  Path: /usr/lib/x86_64-linux-gnu/libcublas.so.11
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcublas.so
+  Path: /usr/lib/x86_64-linux-gnu/libcublas.so
+  Available versions: 11, 11
+Found libcublasLt.so
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcublasLt.so.11
+  Path: /usr/lib/x86_64-linux-gnu/libcublasLt.so.11
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcublasLt.so
+  Path: /usr/lib/x86_64-linux-gnu/libcublasLt.so
+  Available versions: 11, 11
+Found libcufft.so
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcufft.so.10
+  Path: /usr/lib/x86_64-linux-gnu/libcufft.so.10
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcufft.so
+  Path: /usr/lib/x86_64-linux-gnu/libcufft.so
+  Available versions: 10, 10
+Found libcurand.so
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcurand.so.10
+  Path: /usr/lib/x86_64-linux-gnu/libcurand.so.10
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcurand.so
+  Path: /usr/lib/x86_64-linux-gnu/libcurand.so
+  Available versions: 10, 10
+Found libcusolver.so
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcusolver.so.11
+  Path: /usr/lib/x86_64-linux-gnu/libcusolver.so.11
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcusolver.so
+  Path: /usr/lib/x86_64-linux-gnu/libcusolver.so
+  Available versions: 11, 11
+Found libcusparse.so
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcusparse.so.11
+  Path: /usr/lib/x86_64-linux-gnu/libcusparse.so.11
+  Path: /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcusparse.so
+  Path: /usr/lib/x86_64-linux-gnu/libcusparse.so
+  Available versions: 11, 11
+Found libnvidia-ml.so
+  Path: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1
+  Path: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so
+  Available versions: 1
+
+Checking specific CUDA paths:
+
+Contents of /usr/local/cuda/lib64:
+total 24
+lrwxrwxrwx 1 root root 17 May 17 19:48 libcublas.so -> libcublas.so.11.8
+lrwxrwxrwx 1 root root 68 May 17 19:48 libcublas.so.11.8 -> /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcublas.so.11.11.3.6
+lrwxrwxrwx 1 root root 17 May 17 19:48 libcudart.so -> libcudart.so.11.8
+lrwxrwxrwx 1 root root 66 May 17 19:48 libcudart.so.11.8 -> /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcudart.so.11.8.89
+lrwxrwxrwx 1 root root 16 May 17 19:48 libcufft.so -> libcufft.so.11.8
+lrwxrwxrwx 1 root root 67 May 17 19:48 libcufft.so.11.8 -> /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcufft.so.10.9.0.58
+lrwxrwxrwx 1 root root 17 May 17 19:48 libcurand.so -> libcurand.so.11.8
+lrwxrwxrwx 1 root root 68 May 17 19:48 libcurand.so.11.8 -> /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcurand.so.10.3.0.86
+lrwxrwxrwx 1 root root 19 May 17 19:48 libcusolver.so -> libcusolver.so.11.8
+lrwxrwxrwx 1 root root 70 May 17 19:48 libcusolver.so.11.8 -> /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcusolver.so.11.4.1.48
+lrwxrwxrwx 1 root root 19 May 17 19:48 libcusparse.so -> libcusparse.so.11.8
+lrwxrwxrwx 1 root root 70 May 17 19:48 libcusparse.so.11.8 -> /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcusparse.so.11.7.5.86
+
+
+Contents of /usr/local/cuda-11.8/lib64:
+lrwxrwxrwx 1 root root 24 May 17 19:11 /usr/local/cuda-11.8/lib64 -> targets/x86_64-linux/lib
+
+
+Contents of /usr/lib/cuda/lib64:
+total 0
+
+
+LD_LIBRARY_PATH order:
+1. /usr/local/cuda/lib64
+2. /usr/local/cuda/lib64
+3. /usr/local/cuda/lib64
+4. /lib
+
+Attempting CUDA device initialization...
+Number of CUDA devices: 1
+Found 1 CUDA devices
+Successfully got device 0
+Device name: Quadro K2200
+Successfully created CUDA context
+Successfully set context flags
 CUDA initialization test completed successfully
 
-Worker 0 error: init_gpu_context(0) failed
-
-Caused by:
-    0: Failed to get number of CUDA devices
-    1: "initialization error"
+Device name: Quadro K2200
+Address mode: full address (20 bytes)
+Worker 0: Launching kernel at offset 0, batch size 1
+Worker 0: [kernel time: 0.8 ms] tested 1/1, 1189.5 seeds/sec
+Worker 0: Launching kernel at offset 1, batch size 1
+Worker 0: [kernel time: 0.1 ms] tested 1/1, 8758.4 seeds/sec
+Worker 0: Launching kernel at offset 2, batch size 1
+Worker 0: [kernel time: 0.1 ms] tested 1/1, 9236.6 seeds/sec
+Worker 0: Launching kernel at offset 3, batch size 1
+Worker 0: [kernel time: 0.1 ms] tested 1/1, 11282.2 seeds/sec
+Worker 0: Launching kernel at offset 4, batch size 1
+Worker 0: [kernel time: 0.1 ms] tested 1/1, 19483.3 seeds/sec
+Worker 0: Launching kernel at offset 5, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 29339.3 seeds/sec
+Worker 0: Launching kernel at offset 6, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 23366.7 seeds/sec
+Worker 0: Launching kernel at offset 7, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 24097.0 seeds/sec
+Worker 0: Launching kernel at offset 8, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 24072.0 seeds/sec
+Worker 0: Launching kernel at offset 9, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 24108.0 seeds/sec
+Worker 0: Launching kernel at offset 10, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 29430.8 seeds/sec
+Worker 0: Launching kernel at offset 11, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 29705.3 seeds/sec
+Worker 0: Launching kernel at offset 12, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 23388.5 seeds/sec
+Worker 0: Launching kernel at offset 13, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 28569.0 seeds/sec
+Worker 0: Launching kernel at offset 14, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 28858.4 seeds/sec
+Worker 0: Launching kernel at offset 15, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 28870.0 seeds/sec
+Worker 0: Launching kernel at offset 16, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 23500.7 seeds/sec
+Worker 0: Launching kernel at offset 17, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 22676.8 seeds/sec
+Worker 0: Launching kernel at offset 18, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 28337.4 seeds/sec
+Worker 0: Launching kernel at offset 19, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 23126.7 seeds/sec
+Worker 0: Launching kernel at offset 20, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 22860.3 seeds/sec
+Worker 0: Launching kernel at offset 21, batch size 1
+Worker 0: [kernel time: 0.1 ms] tested 1/1, 17039.5 seeds/sec
+Worker 0: Launching kernel at offset 22, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 27232.4 seeds/sec
+Worker 0: Launching kernel at offset 23, batch size 1
+Worker 0: [kernel time: 0.1 ms] tested 1/1, 17705.4 seeds/sec
+Worker 0: Launching kernel at offset 24, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 26239.1 seeds/sec
+Worker 0: Launching kernel at offset 25, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 22846.2 seeds/sec
+Worker 0: Launching kernel at offset 26, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 23109.1 seeds/sec
+Worker 0: Launching kernel at offset 27, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 26435.4 seeds/sec
+Worker 0: Launching kernel at offset 28, batch size 1
+Worker 0: [kernel time: 0.0 ms] tested 1/1, 27060.7 seeds/sec
+Worker 0: Launching kernel at offset 29, batch size 1
+Worker 0: [kernel time: 0.1 ms] tested 1/1, 10921.6 seeds/sec
+Worker 0: Launching kernel at offset 30, batch size 1
+Worker 0: [kernel time: 0.1 ms] tested 1/1, 8973.1 seeds/sec
+Worker 0: Launching kernel at offset 31, batch size 1
+Worker 0: Stream synchronization failed: LaunchTimeout
+Worker 0 error: "the launch timed out and was terminated"
 ❌ Search completed; no matching mnemonic found.
